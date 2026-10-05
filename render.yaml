@@ -1,0 +1,71 @@
+databases:
+  - name: moi-finansy-staging-db
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "17"
+
+services:
+  - type: web
+    name: moi-finansy-staging-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    repo: https://github.com/novilkova17-sudo/moi-finansy
+    autoDeployTrigger: commit
+    buildCommand: bash bootstrap/assemble-bundle2.sh && npm install && npm --workspace @moi-finansy/api run build
+    startCommand: node scripts/migrate-db.mjs && npm --workspace @moi-finansy/api run start
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AUTH_MODE
+        value: prod
+      - key: STAGING_MODE
+        value: "1"
+      - key: EMAIL_DELIVERY_MODE
+        value: outbox
+      - key: ACCESS_TOKEN_SECRET
+        generateValue: true
+      - key: ACCESS_TOKEN_TTL_SECONDS
+        value: "900"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: ALLOW_INSECURE_PROD
+        value: "0"
+      - key: EXPECTED_SCHEMA_VERSION
+        value: 007_email_delivery
+      - key: DATABASE_URL
+        fromDatabase:
+          name: moi-finansy-staging-db
+          property: connectionString
+      - key: WEB_ORIGIN
+        fromService:
+          type: web
+          name: moi-finansy-staging-web
+          property: host
+      - key: APP_PUBLIC_URL
+        fromService:
+          type: web
+          name: moi-finansy-staging-web
+          property: host
+
+  - type: web
+    name: moi-finansy-staging-web
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    repo: https://github.com/novilkova17-sudo/moi-finansy
+    autoDeployTrigger: commit
+    buildCommand: bash bootstrap/assemble-bundle2.sh && npm install && npm --workspace @moi-finansy/web run build
+    startCommand: npm --workspace @moi-finansy/web run start
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_URL
+        fromService:
+          type: web
+          name: moi-finansy-staging-api
+          property: host

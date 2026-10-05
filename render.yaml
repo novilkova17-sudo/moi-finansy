@@ -1,9 +1,3 @@
-databases:
-  - name: moi-finansy-staging-db
-    plan: free
-    region: frankfurt
-    postgresMajorVersion: "17"
-
 services:
   - type: web
     name: moi-finansy-staging-api
@@ -36,19 +30,11 @@ services:
       - key: EXPECTED_SCHEMA_VERSION
         value: 007_email_delivery
       - key: DATABASE_URL
-        fromDatabase:
-          name: moi-finansy-staging-db
-          property: connectionString
+        sync: false
       - key: WEB_ORIGIN
-        fromService:
-          type: web
-          name: moi-finansy-staging-web
-          property: host
+        value: https://moi-finansy-staging-web.onrender.com
       - key: APP_PUBLIC_URL
-        fromService:
-          type: web
-          name: moi-finansy-staging-web
-          property: host
+        value: https://moi-finansy-staging-web.onrender.com
 
   - type: web
     name: moi-finansy-staging-web
@@ -65,7 +51,4 @@ services:
       - key: NODE_ENV
         value: production
       - key: API_URL
-        fromService:
-          type: web
-          name: moi-finansy-staging-api
-          property: host
+        value: https://moi-finansy-staging-api.onrender.com

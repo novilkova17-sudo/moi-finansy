@@ -25,4 +25,28 @@ cp "$ROOT/bootstrap/patches/api-tsconfig.json" "$ROOT/apps/api/tsconfig.json"
 cp "$ROOT/bootstrap/patches/debts.module.ts" "$ROOT/apps/api/src/debts/debts.module.ts"
 cp "$ROOT/bootstrap/patches/notifications.module.ts" "$ROOT/apps/api/src/notifications/notifications.module.ts"
 
+# Fix account deletion cascade blockers (budget_items/categories and ledger_entries/accounts).
+node <<'NODE'
+const fs = require('fs');
+const p = process.cwd() + '/apps/api/src/auth/auth.service.ts';
+let src = fs.readFileSync(p, 'utf8');
+const old = `    await this.audit(userId,'ACCOUNT_DELETE','USER',userId,{});
+    await this.db.query(\`DELETE FROM users WHERE id=$1\`,[userId]);
+    return {success:true};
+`;
+const replacement = `    await this.audit(userId,'ACCOUNT_DELETE','USER',userId,{});
+    await this.db.transaction(async client=>{
+      await client.query(
+        \`DELETE FROM budget_items WHERE budget_id IN (SELECT id FROM budgets WHERE user_id=$1)\`,
+        [userId],
+      );
+      await client.query(\`DELETE FROM ledger_entries WHERE user_id=$1\`,[userId]);
+      await client.query(\`DELETE FROM users WHERE id=$1\`,[userId]);
+    });
+    return {success:true};
+`;
+if (!src.includes(old)) throw new Error('Account deletion patch target not found');
+fs.writeFileSync(p, src.replace(old, replacement));
+NODE
+
 echo "Source bundle unpacked successfully."

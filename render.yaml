@@ -13,7 +13,7 @@ services:
     branch: main
     repo: https://github.com/novilkova17-sudo/moi-finansy
     autoDeployTrigger: commit
-    buildCommand: bash bootstrap/assemble-bundle2.sh && npm install && npm --workspace @moi-finansy/api run build
+    buildCommand: bash bootstrap/assemble-bundle2.sh && npm install --include=dev && npm --workspace @moi-finansy/api run build
     startCommand: node scripts/migrate-db.mjs && npm --workspace @moi-finansy/api run start
     healthCheckPath: /health/ready
     envVars:
@@ -58,7 +58,7 @@ services:
     branch: main
     repo: https://github.com/novilkova17-sudo/moi-finansy
     autoDeployTrigger: commit
-    buildCommand: bash bootstrap/assemble-bundle2.sh && npm install && npm --workspace @moi-finansy/web run build
+    buildCommand: bash bootstrap/assemble-bundle2.sh && npm install --include=dev && npm --workspace @moi-finansy/web run build
     startCommand: npm --workspace @moi-finansy/web run start
     healthCheckPath: /login
     envVars:

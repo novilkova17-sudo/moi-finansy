@@ -17,4 +17,9 @@ if [[ "$ACTUAL" != "$EXPECTED" ]]; then
 fi
 
 tar -xzf "$TMP_TGZ" -C "$ROOT"
+
+# Apply small staging/build fixes that landed after the source bundle snapshot.
+cp "$ROOT/bootstrap/patches/reset-password-page.tsx" "$ROOT/apps/web/app/reset-password/page.tsx"
+cp "$ROOT/bootstrap/patches/verify-email-page.tsx" "$ROOT/apps/web/app/verify-email/page.tsx"
+
 echo "Source bundle unpacked successfully."

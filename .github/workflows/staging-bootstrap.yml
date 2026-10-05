@@ -1,0 +1,106 @@
+name: Staging bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_api_base_url:
+        description: Public HTTPS staging API URL for the phone APK
+        required: false
+        type: string
+  push:
+    branches: [main]
+
+jobs:
+  api-web:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: moi_finansy_gate
+          POSTGRES_USER: finance
+          POSTGRES_PASSWORD: finance_gate_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U finance -d moi_finansy_gate"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://finance:finance_gate_password@127.0.0.1:5432/moi_finansy_gate
+      AUTH_MODE: prod
+      NODE_ENV: production
+      STAGING_MODE: '1'
+      EMAIL_DELIVERY_MODE: outbox
+      ACCESS_TOKEN_SECRET: staging_gate_access_secret_that_is_longer_than_32_characters
+      ACCESS_TOKEN_TTL_SECONDS: 900
+      WEB_ORIGIN: https://staging.invalid
+      APP_PUBLIC_URL: https://staging.invalid
+      EXPECTED_SCHEMA_VERSION: 007_email_delivery
+      API_URL: http://127.0.0.1:4000
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack project source
+        run: bash bootstrap/assemble-bundle2.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm install
+      - name: Apply migrations
+        run: npm run db:migrate:node
+      - name: Build API and Web
+        run: npm run build
+      - name: Start API
+        run: |
+          npm --workspace @moi-finansy/api run start > /tmp/moi-finansy-api.log 2>&1 &
+          for i in {1..45}; do
+            if curl -fsS http://127.0.0.1:4000/health/ready >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/moi-finansy-api.log
+          exit 1
+      - name: Production-auth staging smoke
+        run: npm run smoke:staging
+      - name: Financial integrity
+        run: npm run integrity
+      - name: API log on failure
+        if: failure()
+        run: cat /tmp/moi-finansy-api.log || true
+
+  android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack project source
+        run: bash bootstrap/assemble-bundle2.sh
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: yes | sdkmanager "platforms;android-37" "build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+      - name: Build emulator APK
+        working-directory: apps/android
+        run: gradle --no-daemon assembleDebug
+      - name: Build phone staging APK
+        working-directory: apps/android
+        env:
+          MF_STAGING_API_BASE_URL: ${{ inputs.staging_api_base_url || 'https://api.example.invalid' }}
+        run: gradle --no-daemon assembleStaging
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moi-finansy-emulator-debug-apk
+          if-no-files-found: error
+          path: apps/android/app/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.staging_api_base_url != '' }}
+        with:
+          name: moi-finansy-first-phone-staging-apk
+          if-no-files-found: error
+          path: apps/android/app/build/outputs/apk/staging/*.apk

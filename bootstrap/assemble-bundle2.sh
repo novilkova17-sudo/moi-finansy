@@ -28,6 +28,9 @@ cp "$ROOT/bootstrap/patches/notifications.module.ts" "$ROOT/apps/api/src/notific
 # Android API 36 compatibility for hosted CI runners.
 sed -i 's/compileSdk = 37/compileSdk = 36/; s/targetSdk = 37/targetSdk = 36/' "$ROOT/apps/android/app/build.gradle.kts"
 
+# Keep the current Kotlin Android plugin compatible with AGP 9 during staging builds.
+printf '\nandroid.newDsl=false\n' >> "$ROOT/apps/android/gradle.properties"
+
 # Fix account deletion cascade blockers (budget_items/categories and ledger_entries/accounts).
 node <<'NODE'
 const fs = require('fs');

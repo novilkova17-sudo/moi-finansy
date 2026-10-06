@@ -31,6 +31,9 @@ sed -i 's/compileSdk = 37/compileSdk = 36/; s/targetSdk = 37/targetSdk = 36/' "$
 # Keep the current Kotlin Android plugin compatible with AGP 9 during staging builds.
 printf '\nandroid.newDsl=false\n' >> "$ROOT/apps/android/gradle.properties"
 
+# Align Java and Kotlin bytecode targets on JDK 17.
+sed -i 's/JavaVersion.VERSION_11/JavaVersion.VERSION_17/g' "$ROOT/apps/android/app/build.gradle.kts"
+
 # Fix account deletion cascade blockers (budget_items/categories and ledger_entries/accounts).
 node <<'NODE'
 const fs = require('fs');

@@ -32,7 +32,18 @@ sed -i 's/compileSdk = 37/compileSdk = 36/; s/targetSdk = 37/targetSdk = 36/' "$
 printf '\nandroid.newDsl=false\n' >> "$ROOT/apps/android/gradle.properties"
 
 # Align Java and Kotlin bytecode targets on JDK 17.
-sed -i 's/JavaVersion.VERSION_11/JavaVersion.VERSION_17/g' "$ROOT/apps/android/app/build.gradle.kts"
+node <<'NODE_ANDROID_JVM'
+const fs = require('fs');
+const p = process.cwd() + '/apps/android/app/build.gradle.kts';
+let src = fs.readFileSync(p, 'utf8');
+if (!src.includes('compileOptions {')) {
+  src = src.replace(
+    '    compileSdk = 36\n',
+    '    compileSdk = 36\n    compileOptions {\n        sourceCompatibility = JavaVersion.VERSION_17\n        targetCompatibility = JavaVersion.VERSION_17\n    }\n'
+  );
+}
+fs.writeFileSync(p, src);
+NODE_ANDROID_JVM
 
 # Fix account deletion cascade blockers (budget_items/categories and ledger_entries/accounts).
 node <<'NODE'

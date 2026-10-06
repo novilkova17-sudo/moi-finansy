@@ -25,6 +25,9 @@ cp "$ROOT/bootstrap/patches/api-tsconfig.json" "$ROOT/apps/api/tsconfig.json"
 cp "$ROOT/bootstrap/patches/debts.module.ts" "$ROOT/apps/api/src/debts/debts.module.ts"
 cp "$ROOT/bootstrap/patches/notifications.module.ts" "$ROOT/apps/api/src/notifications/notifications.module.ts"
 
+# Android API 36 compatibility for hosted CI runners.
+sed -i 's/compileSdk = 37/compileSdk = 36/; s/targetSdk = 37/targetSdk = 36/' "$ROOT/apps/android/app/build.gradle.kts"
+
 # Fix account deletion cascade blockers (budget_items/categories and ledger_entries/accounts).
 node <<'NODE'
 const fs = require('fs');

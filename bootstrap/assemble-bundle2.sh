@@ -76,6 +76,71 @@ function walk(dir) {
 walk(root);
 NODE_MATERIAL3_OPTIN
 
+# Fix Android source compile blockers found by CI.
+node <<'NODE_ANDROID_SOURCE_FIXES'
+const fs = require('fs');
+
+const budgetPath = process.cwd() + '/apps/android/app/src/main/java/com/moifinansy/app/features/budget/BudgetScreen.kt';
+let budget = fs.readFileSync(budgetPath, 'utf8');
+budget = budget.replace('onClick={save}){Text("Сохранить")}', 'onClick={save()}){Text("Сохранить")}');
+fs.writeFileSync(budgetPath, budget);
+
+const planPath = process.cwd() + '/apps/android/app/src/main/java/com/moifinansy/app/features/planning/PlanScreen.kt';
+let plan = fs.readFileSync(planPath, 'utf8');
+const oldSelect = '@Composable private fun Select(label:String,options:List<Pair<String,String>>,value:String,onChange:(String)->Unit){var open by remember{mutableStateOf(false)};Box{OutlinedButton(onClick={open=true},Modifier.fillMaxWidth()){Text("$label: "+(options.firstOrNull{it.first==value}?.second?:"—"),maxLines=1)};DropdownMenu(open,{open=false}){options.forEach{(id,name)->DropdownMenuItem(text={Text(name)},onClick={onChange(id);open=false})}}}}';
+const newSelect = `@Composable
+private fun Select(
+    label: String,
+    options: List<Pair<String, String>>,
+    value: String,
+    onChange: (String) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    val selectedLabel = options.firstOrNull { option -> option.first == value }?.second ?: "—"
+    Box {
+        OutlinedButton(
+            onClick = { open = true },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("$label: $selectedLabel", maxLines = 1)
+        }
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+        ) {
+            options.forEach { (id, name) ->
+                DropdownMenuItem(
+                    text = { Text(name) },
+                    onClick = {
+                        onChange(id)
+                        open = false
+                    },
+                )
+            }
+        }
+    }
+}`;
+if (!plan.includes(oldSelect)) throw new Error('Plan Select patch target not found');
+plan = plan.replace(oldSelect, newSelect);
+fs.writeFileSync(planPath, plan);
+
+for (const variant of ['debug', 'staging']) {
+  const p = process.cwd() + '/apps/android/app/src/' + variant + '/AndroidManifest.xml';
+  let manifest = fs.readFileSync(p, 'utf8');
+  if (!manifest.includes('xmlns:tools=')) {
+    manifest = manifest.replace(
+      '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
+      '<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">'
+    );
+  }
+  manifest = manifest.replace(
+    /<application\s+([^>]*?)android:usesCleartextTraffic="(true|false)"\s*\/>/s,
+    (_m, before, value) => '<application\n        ' + before.trim() + (before.trim() ? '\n        ' : '') + 'android:usesCleartextTraffic="' + value + '"\n        tools:replace="android:usesCleartextTraffic" />'
+  );
+  fs.writeFileSync(p, manifest);
+}
+NODE_ANDROID_SOURCE_FIXES
+
 # Fix account deletion cascade blockers (budget_items/categories and ledger_entries/accounts).
 node <<'NODE'
 const fs = require('fs');

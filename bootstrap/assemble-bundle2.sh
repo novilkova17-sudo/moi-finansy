@@ -87,7 +87,9 @@ fs.writeFileSync(budgetPath, budget);
 
 const planPath = process.cwd() + '/apps/android/app/src/main/java/com/moifinansy/app/features/planning/PlanScreen.kt';
 let plan = fs.readFileSync(planPath, 'utf8');
-const oldSelect = '@Composable private fun Select(label:String,options:List<Pair<String,String>>,value:String,onChange:(String)->Unit){var open by remember{mutableStateOf(false)};Box{OutlinedButton(onClick={open=true},Modifier.fillMaxWidth()){Text("$label: "+(options.firstOrNull{it.first==value}?.second?:"—"),maxLines=1)};DropdownMenu(open,{open=false}){options.forEach{(id,name)->DropdownMenuItem(text={Text(name)},onClick={onChange(id);open=false})}}}}';
+const selectStart = plan.indexOf('@Composable private fun Select(');
+const selectEnd = plan.indexOf('\nprivate fun statusLabel', selectStart);
+if (selectStart < 0 || selectEnd < 0) throw new Error('Plan Select boundaries not found');
 const newSelect = `@Composable
 private fun Select(
     label: String,
@@ -120,8 +122,7 @@ private fun Select(
         }
     }
 }`;
-if (!plan.includes(oldSelect)) throw new Error('Plan Select patch target not found');
-plan = plan.replace(oldSelect, newSelect);
+plan = plan.slice(0, selectStart) + newSelect + plan.slice(selectEnd);
 fs.writeFileSync(planPath, plan);
 
 for (const variant of ['debug', 'staging']) {

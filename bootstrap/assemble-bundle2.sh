@@ -142,6 +142,15 @@ for (const variant of ['debug', 'staging']) {
 }
 NODE_ANDROID_SOURCE_FIXES
 
+# Kotlin 2.4 no longer accepts String(Double) constructor usage.
+node <<'NODE_PLAN_AMOUNT_FIX'
+const fs = require('fs');
+const p = process.cwd() + '/apps/android/app/src/main/java/com/moifinansy/app/features/planning/PlanScreen.kt';
+let src = fs.readFileSync(p, 'utf8');
+src = src.replace('String(item.amountMinor/100.0)', '(item.amountMinor/100.0).toString()');
+fs.writeFileSync(p, src);
+NODE_PLAN_AMOUNT_FIX
+
 # Fix account deletion cascade blockers (budget_items/categories and ledger_entries/accounts).
 node <<'NODE'
 const fs = require('fs');

@@ -136,7 +136,13 @@ for (const variant of ['debug', 'staging']) {
   }
   manifest = manifest.replace(
     /<application\s+([^>]*?)android:usesCleartextTraffic="(true|false)"\s*\/>/s,
-    (_m, before, value) => '<application\n        ' + before.trim() + (before.trim() ? '\n        ' : '') + 'android:usesCleartextTraffic="' + value + '"\n        tools:replace="android:usesCleartextTraffic" />'
+    (_m, before, value) => {
+      const replaceAttrs = variant === 'staging'
+        ? 'android:label,android:usesCleartextTraffic'
+        : 'android:usesCleartextTraffic';
+      return '<application\n        ' + before.trim() + (before.trim() ? '\n        ' : '') +
+        'android:usesCleartextTraffic="' + value + '"\n        tools:replace="' + replaceAttrs + '" />';
+    }
   );
   fs.writeFileSync(p, manifest);
 }

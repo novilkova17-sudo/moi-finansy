@@ -25,8 +25,17 @@ cp "$ROOT/bootstrap/patches/api-tsconfig.json" "$ROOT/apps/api/tsconfig.json"
 cp "$ROOT/bootstrap/patches/debts.module.ts" "$ROOT/apps/api/src/debts/debts.module.ts"
 cp "$ROOT/bootstrap/patches/notifications.module.ts" "$ROOT/apps/api/src/notifications/notifications.module.ts"
 
-# Android API 36 compatibility for hosted CI runners.
-sed -i 's/compileSdk = 37/compileSdk = 36/; s/targetSdk = 37/targetSdk = 36/' "$ROOT/apps/android/app/build.gradle.kts"
+# Android 17 / API 37.0 uses a minor-versioned platform package.
+node <<'NODE_ANDROID_SDK'
+const fs = require('fs');
+const p = process.cwd() + '/apps/android/app/build.gradle.kts';
+let src = fs.readFileSync(p, 'utf8');
+src = src.replace(
+  '    compileSdk = 37\n',
+  '    compileSdk {\n        version = release(37) {\n            minorApiLevel = 0\n        }\n    }\n'
+);
+fs.writeFileSync(p, src);
+NODE_ANDROID_SDK
 
 # Keep the current Kotlin Android plugin compatible with AGP 9 during staging builds.
 printf '\nandroid.newDsl=false\n' >> "$ROOT/apps/android/gradle.properties"
@@ -37,13 +46,35 @@ const fs = require('fs');
 const p = process.cwd() + '/apps/android/app/build.gradle.kts';
 let src = fs.readFileSync(p, 'utf8');
 if (!src.includes('compileOptions {')) {
+  const marker = '    defaultConfig {';
   src = src.replace(
-    '    compileSdk = 36\n',
-    '    compileSdk = 36\n    compileOptions {\n        sourceCompatibility = JavaVersion.VERSION_17\n        targetCompatibility = JavaVersion.VERSION_17\n    }\n'
+    marker,
+    '    compileOptions {\n        sourceCompatibility = JavaVersion.VERSION_17\n        targetCompatibility = JavaVersion.VERSION_17\n    }\n' + marker
   );
 }
 fs.writeFileSync(p, src);
 NODE_ANDROID_JVM
+
+# Material3 TopAppBar is still experimental in the current Compose line.
+node <<'NODE_MATERIAL3_OPTIN'
+const fs = require('fs');
+const path = require('path');
+const root = process.cwd() + '/apps/android/app/src/main/java';
+function walk(dir) {
+  for (const entry of fs.readdirSync(dir, {withFileTypes:true})) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(p);
+    else if (entry.isFile() && p.endsWith('.kt')) {
+      let src = fs.readFileSync(p, 'utf8');
+      if (src.includes('TopAppBar(') && !src.includes('@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)')) {
+        src = '@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)\n\n' + src;
+        fs.writeFileSync(p, src);
+      }
+    }
+  }
+}
+walk(root);
+NODE_MATERIAL3_OPTIN
 
 # Fix account deletion cascade blockers (budget_items/categories and ledger_entries/accounts).
 node <<'NODE'
